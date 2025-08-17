@@ -1,12 +1,16 @@
-.PHONY: prepare install-deps install-tfenv install-packer install-libvirt-packer configure-libvirt
+PACKER_VERSION := 1.10.0
+QEMU_VERSION := 8.2.0
 
-prepare: install-deps install-tfenv install-packer install-libvirt-packer setup-sudoers configure-libvirt
+.PHONY: prepare install-deps install-tfenv install-packer install-qemu install-libvirt-packer setup-sudoers configure-libvirt check clean
+
+prepare: install-deps install-tfenv install-packer install-qemu install-libvirt-packer setup-sudoers configure-libvirt
 	@echo "✅ Setup complete!"
 
 install-deps:
 	@echo "🔧 Installing required packages..."
 	sudo apt update && sudo apt install -y \
-		curl wget unzip qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virtinst
+		curl wget unzip git \
+		qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virtinst
 	@echo "🔧 Configuring libvirt group permissions..."
 	@USER=$$(whoami); \
 	for group in libvirt kvm; do \
@@ -33,21 +37,25 @@ install-tfenv:
 	fi
 
 install-packer:
-	@echo "⬇️ Installing packer..."
+	@echo "⬇️ Installing packer $(PACKER_VERSION)..."
 	@if ! command -v packer >/dev/null 2>&1; then \
-		wget https://releases.hashicorp.com/packer/1.10.0/packer_1.10.0_linux_amd64.zip && \
-		unzip packer_1.10.0_linux_amd64.zip && \
+		wget https://releases.hashicorp.com/packer/$(PACKER_VERSION)/packer_$(PACKER_VERSION)_linux_amd64.zip && \
+		unzip -o packer_$(PACKER_VERSION)_linux_amd64.zip && \
 		sudo mv packer /usr/local/bin/ && \
-		rm packer_1.10.0_linux_amd64.zip && \
+		rm packer_$(PACKER_VERSION)_linux_amd64.zip && \
 		echo "✅ packer installation complete"; \
 	else \
 		echo "⚠️ packer is already installed."; \
 	fi
 
+install-qemu:
+	@echo "⬇️ Installing QEMU ($(QEMU_VERSION) or nearest available via apt)..."
+	sudo apt update && sudo apt install -y qemu-system-x86 qemu-utils
+	@echo "✅ QEMU installed (version may vary based on repository)."
+
 install-libvirt-packer:
 	@echo "🔌 Initializing packer plugins (including QEMU plugin)..."
 	@bash -c 'pushd base/packer > /dev/null && packer init ubuntu.pkr.hcl && popd > /dev/null'
-
 
 setup-sudoers:
 	@echo "🔐 Setting up passwordless sudo..."
@@ -80,7 +88,11 @@ configure-libvirt:
 	@sudo sed -i 's|^#\?\s*security_driver\s*=.*|security_driver = "none"|' /etc/libvirt/qemu.conf && \
 	echo "✅ Set security_driver = \"none\" successfully"
 
-
-# 📝 First, run `make prepare` to install all build dependencies.
-# 🧑‍💻 Then, run `make setup-sudoers` to add your user to sudoers.
-# 🔁 After that, logout and login again to apply group changes before continuing.
+check:
+	@echo "🧪 Packer version: $$(packer version | head -n 1)"
+	@echo "🧪 QEMU version: $$(qemu-system-x86_64 --version | head -n 1)"
+	
+clean:
+	@echo "🧹 Cleaning up build artifacts..."
+	rm -f packer_$(PACKER_VERSION)_linux_amd64.zip
+	rm -rf output/*.qcow2
