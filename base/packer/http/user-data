@@ -1,0 +1,57 @@
+#cloud-config
+autoinstall:
+  version: 1
+  
+  identity:
+    hostname: ubuntu-server
+    password: "$6$exDY1mhS4KUYCE/2$zmn9ToZwTKLhCw.b4/b.ZRTIZM30JZ4QrOQ2aOXJ8yk96xpcCof0kxKwuX1kqLG/ygbJ1f8wxED22bTL4F46P0"
+    username: ubuntu
+  
+  locale: en_US.UTF-8
+  
+  ssh:
+    install-server: true
+    allow-pw: true
+  
+  keyboard:
+    layout: us
+  
+  # Install Minimal Package
+  packages:
+    - cloud-init
+    - openssh-server
+    - sudo
+  
+  storage:
+    layout:
+      name: direct
+    config:
+      - type: disk
+        id: disk0
+        match:
+          size: largest
+      - type: partition
+        id: partition0
+        device: disk0
+        size: -1
+        flag: boot
+      - type: format
+        id: format0
+        volume: partition0
+        fstype: ext4
+        extra_options: ['-O', '^64bit,^metadata_csum', '-E', 'lazy_itable_init=0,lazy_journal_init=0']
+      - type: mount
+        id: mount0
+        device: format0
+        path: /
+  
+  updates: security
+  package_update: false
+  package_upgrade: false
+  
+  timezone: Asia/Seoul
+  
+  late-commands:
+    - "echo 'ubuntu ALL=(ALL) NOPASSWD: ALL' > /target/etc/sudoers.d/ubuntu"
+    - curtin in-target --target=/target -- chmod 440 /etc/sudoers.d/ubuntu
+    - curtin in-target --target=/target -- cloud-init clean

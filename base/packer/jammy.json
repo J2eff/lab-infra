@@ -1,0 +1,63 @@
+{
+  "builders": [
+    {
+      "accelerator": "kvm",
+      "boot_command": [
+        "c",
+        "linux /casper/vmlinuz console=tty0 console=ttyS0,115200 autoinstall ds='nocloud-net;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/' ---",
+        "<enter><wait>",
+        "initrd /casper/initrd<enter><wait>",
+        "boot<enter>"
+      ],
+      "boot_wait": "10s",
+      "cpus": 2,
+      "disk_size": "{{user `disk_size`}}G",
+      "format": "qcow2",
+      "headless": true,
+      "vnc_bind_address": "0.0.0.0",
+      "vnc_port_max": 30930,
+      "vnc_port_min": 30921,
+      "http_directory": "http",
+      "iso_checksum": "sha256:9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0",
+      "iso_url": "https://releases.ubuntu.com/jammy/ubuntu-22.04.5-live-server-amd64.iso",
+      "memory": 4096,
+      "name": "{{user `vm_name`}}",
+      "output_directory": "{{user `output_directory`}}",
+      "vm_name": "{{user `vm_name`}}",
+      "shutdown_command": "echo '{{user `password`}}' | sudo -S poweroff",
+      "ssh_password": "{{user `password`}}",
+      "ssh_timeout": "1800s",
+      "ssh_username": "{{user `user`}}",
+      "type": "qemu"
+    }
+  ],
+  "provisioners": [
+    {
+      "execute_command": "echo '{{user `password`}}' | {{.Vars}} sudo -E -S bash '{{.Path}}'",
+      "scripts": [
+        "scripts/clean-ubuntu.sh",
+        "scripts/minimize.sh"
+      ],
+      "type": "shell"
+      }
+    ],
+  "post-processors": [
+    {
+      "type": "shell-local",
+      "inline": [
+        "echo 'Converting to compressed qcow2 format to reduce file size...'",
+        "qemu-img convert -c -O qcow2 {{user `output_directory`}}/{{user `vm_name`}} {{user `output_directory`}}/{{user `vm_name`}}.qcow2",
+        "rm {{user `output_directory`}}/{{user `vm_name`}}",
+        "ls -lh {{user `output_directory`}}/{{user `vm_name`}}.qcow2"
+      ]
+    }
+  ],
+  "variables": {
+    "disk_size": "5",
+    "name": "ubuntu-jammy-minimal",
+    "vm_name" : "ubuntu-jammy-base",
+    "output_directory": "build-jammy-base",
+    "password": "ubuntu",
+    "user": "ubuntu"
+  }
+}
